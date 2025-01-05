@@ -2,17 +2,18 @@ use std::collections::HashMap;
 
 // https://en.wikipedia.org/wiki/Bencode
 
+const INT_DELIM_BEGIN: u8 = b'i';
+const DELIM_END: u8 = b'e';
+
 #[derive(Debug, PartialEq)]
 pub enum BValue {
     Str(String),
     Int(i16),
     List(Vec<BValue>),
     Dict(HashMap<String, BValue>),
+    // TODO: remove later
     None
 }
-
-const INT_DELIM_BEGIN: u8 = b'i';
-const DELIM_END: u8 = b'e';
 
 pub fn decode(input: &[u8]) -> Result<BValue, String> {
     let mut idx = 0;
