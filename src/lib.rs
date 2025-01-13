@@ -3,7 +3,10 @@ use std::collections::HashMap;
 // https://en.wikipedia.org/wiki/Bencode
 
 const INT_DELIM_BEGIN: u8 = b'i';
+const DICT_DELIM_BEGIN: u8 = b'd';
+const LIST_DELIM_BEGIN: u8 = b'l';
 const DELIM_END: u8 = b'e';
+const COLON_DELIM: u8 = b':';
 
 #[derive(Debug, PartialEq)]
 pub enum BValue {
@@ -12,37 +15,63 @@ pub enum BValue {
     List(Vec<BValue>),
     Dict(HashMap<String, BValue>),
     // TODO: remove later
-    None
+    None,
 }
 
 pub fn decode(input: &[u8]) -> Result<BValue, String> {
-    let mut idx = 0;
-    // check for type delimiters
-    // create branches for each Bencode type
-
-    if input[idx] == INT_DELIM_BEGIN {
-       let mut n = String::new();
-       idx += 1;
-
-       unsafe {
-        let vec = n.as_mut_vec();
-
-        while input[idx] != DELIM_END {
-            vec.push(input[idx]);
+    match input[0] {
+        INT_DELIM_BEGIN => {
+            let mut idx = 0;
+            let mut n = String::new();
             idx += 1;
-        }
 
-        if vec.is_empty() {
-            return Err(String::from("Decoding Error: Empty Integer Not-allowed."));
-        }
-       }
-       
-       let n = n.parse::<i16>().map_err(|_e| String::from("Decoding Error: Ill-formatted Integer."))?;
+            unsafe {
+                let vec = n.as_mut_vec();
 
-       return Ok(BValue::Int(n));
+                while input[idx] != DELIM_END {
+                    vec.push(input[idx]);
+                    idx += 1;
+                }
+
+                if vec.is_empty() {
+                    return Err(String::from("Decoding Error: Empty Integer Not-allowed."));
+                }
+            }
+            
+            let n = n.parse::<i16>().map_err(|_e| String::from("Decoding Error: Ill-formatted Integer."))?;
+
+
+            let n = nreturn Ok(BValue::Int(n));
+        }    
+                
+        LIST_DELIM_BEGIN => {
+            // parse list 
+            Ok(BValue::None)
+        }
+        DICT_DELIM_BEGIN > {
+            // parse dictionary
+            Ok(BValue::None)
+        }
+        _ => {
+            // Beconde strings
+            let mut idx = 0;
+            while input[idx] != COLON_DELIM {
+                idx += 1;
+            }
+            let len = String::from_utf8_lossy(&input[..idx]);
+            let len = len.parse::<usize>().map_err(|_e| String::from("Decoding Error. Invalid string length."))?;
+            idx += 1;
+
+            let string = 
+                .parse::<usize>()
+                dx + len).ok_or(String::from("Decoding Error. Invalid string length."))?;
+            let string = String::from_utf8(string.to_vec()).unwrap();
+
+            return Ok(BValue::S
+                tr(string));
+                
+        }
     }
-
-    Ok(BValue::None)
 }
 
 #[cfg(test)]
