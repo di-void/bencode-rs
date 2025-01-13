@@ -37,18 +37,18 @@ pub fn decode(input: &[u8]) -> Result<BValue, String> {
                     return Err(String::from("Decoding Error: Empty Integer Not-allowed."));
                 }
             }
-            
-            let n = n.parse::<i16>().map_err(|_e| String::from("Decoding Error: Ill-formatted Integer."))?;
 
+            let n = n
+                .parse::<i16>()
+                .map_err(|_e| String::from("Decoding Error: Ill-formatted Integer."))?;
 
-            let n = nreturn Ok(BValue::Int(n));
-        }    
-                
+            return Ok(BValue::Int(n));
+        }
         LIST_DELIM_BEGIN => {
-            // parse list 
+            // parse list
             Ok(BValue::None)
         }
-        DICT_DELIM_BEGIN > {
+        DICT_DELIM_BEGIN => {
             // parse dictionary
             Ok(BValue::None)
         }
@@ -59,17 +59,17 @@ pub fn decode(input: &[u8]) -> Result<BValue, String> {
                 idx += 1;
             }
             let len = String::from_utf8_lossy(&input[..idx]);
-            let len = len.parse::<usize>().map_err(|_e| String::from("Decoding Error. Invalid string length."))?;
+            let len = len
+                .parse::<usize>()
+                .map_err(|_e| String::from("Decoding Error. Invalid string length."))?;
             idx += 1;
 
-            let string = 
-                .parse::<usize>()
-                dx + len).ok_or(String::from("Decoding Error. Invalid string length."))?;
+            let string = &input
+                .get(idx..idx + len)
+                .ok_or(String::from("Decoding Error. Invalid string length."))?;
             let string = String::from_utf8(string.to_vec()).unwrap();
 
-            return Ok(BValue::S
-                tr(string));
-                
+            return Ok(BValue::Str(string));
         }
     }
 }
