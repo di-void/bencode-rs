@@ -18,12 +18,13 @@ pub enum BValue {
     None,
 }
 
-pub fn decode(input: &[u8]) -> Result<BValue, String> {
+pub fn decode(input: &[u8]) -> Result<(BValue, usize), String> {
     match input[0] {
+        // Integers
         INT_DELIM_BEGIN => {
-            let mut idx = 0;
+            // move forward to the first digit
+            let mut idx = 1;
             let mut n = String::new();
-            idx += 1;
 
             unsafe {
                 let vec = n.as_mut_vec();
@@ -42,18 +43,35 @@ pub fn decode(input: &[u8]) -> Result<BValue, String> {
                 .parse::<i16>()
                 .map_err(|_e| String::from("Decoding Error: Ill-formatted Integer."))?;
 
-            return Ok(BValue::Int(n));
+            return Ok((BValue::Int(n), idx + 1));
         }
         LIST_DELIM_BEGIN => {
-            // parse list
-            Ok(BValue::None)
+            // Lists
+            let mut idx = 1;
+            let mut list = Vec::new();
+            loop {
+                let (value, consumed) = decode(&input[idx..])?;
+                idx += consumed;
+                match value {
+                    BValue::None => {
+                        return Ok((BValue::List(list), idx));
+                    }
+                    v => {
+                        list.push(v);
+                    }
+                }
+            }
         }
         DICT_DELIM_BEGIN => {
-            // parse dictionary
-            Ok(BValue::None)
+            // Dictionaries
+            Ok((BValue::None, 1))
+        }
+        DELIM_END => {
+            // Empty
+            Ok((BValue::None, 1))
         }
         _ => {
-            // Beconde strings
+            // Strings
             let mut idx = 0;
             while input[idx] != COLON_DELIM {
                 idx += 1;
@@ -69,7 +87,7 @@ pub fn decode(input: &[u8]) -> Result<BValue, String> {
                 .ok_or(String::from("Decoding Error. Invalid string length."))?;
             let string = String::from_utf8(string.to_vec()).unwrap();
 
-            return Ok(BValue::Str(string));
+            return Ok((BValue::Str(string), idx + len));
         }
     }
 }
@@ -82,13 +100,13 @@ mod tests {
     #[test]
     fn test_integer_decoding() {
         // Basic integers
-        assert_eq!(decode(b"i42e").unwrap(), BValue::Int(42));
-        assert_eq!(decode(b"i0e").unwrap(), BValue::Int(0));
-        assert_eq!(decode(b"i-42e").unwrap(), BValue::Int(-42));
+        assert_eq!(decode(b"i42e").unwrap().0, BValue::Int(42));
+        assert_eq!(decode(b"i0e").unwrap().0, BValue::Int(0));
+        assert_eq!(decode(b"i-42e").unwrap().0, BValue::Int(-42));
 
         // Edge cases
-        assert_eq!(decode(b"i042e").unwrap(), BValue::Int(42)); // Leading zeros not allowed. ALERT! will be normalized
-        assert_eq!(decode(b"i-0e").unwrap(), BValue::Int(0)); // Negative zero not allowed. ALERT! will be normalized
+        assert_eq!(decode(b"i042e").unwrap().0, BValue::Int(42)); // Leading zeros not allowed. ALERT! will be normalized
+        assert_eq!(decode(b"i-0e").unwrap().0, BValue::Int(0)); // Negative zero not allowed. ALERT! will be normalized
         assert!(decode(b"ie").is_err()); // Empty integer not allowed
         assert!(decode(b"i32be").is_err()); // Non-digit characters not allowed
     }
@@ -96,10 +114,10 @@ mod tests {
     #[test]
     fn test_string_decoding() {
         // Basic strings
-        assert_eq!(decode(b"4:spam").unwrap(), BValue::Str("spam".to_string()));
-        assert_eq!(decode(b"0:").unwrap(), BValue::Str("".to_string()));
+        assert_eq!(decode(b"4:spam").unwrap().0, BValue::Str("spam".to_string()));
+        assert_eq!(decode(b"0:").unwrap().0, BValue::Str("".to_string()));
         assert_eq!(
-            decode(b"5:hello").unwrap(),
+            decode(b"5:hello").unwrap().0,
             BValue::Str("hello".to_string())
         );
 
@@ -112,17 +130,17 @@ mod tests {
     #[test]
     fn test_list_decoding() {
         // Empty list
-        assert_eq!(decode(b"le").unwrap(), BValue::List(vec![]));
+        assert_eq!(decode(b"le").unwrap().0, BValue::List(vec![]));
 
         // Simple list
         assert_eq!(
-            decode(b"l4:spami42ee").unwrap(),
-            BValue::List(vec![BValue::Str("spam".to_string()), BValue::Int(42),])
+            decode(b"l4:spami42ee").unwrap().0,
+            BValue::List(vec![BValue::Str("spam".to_string()), BValue::Int(42)])
         );
 
         // Nested list
         assert_eq!(
-            decode(b"ll4:spameli42eee").unwrap(),
+            decode(b"ll4:spameli42eee").unwrap().0,
             BValue::List(vec![
                 BValue::List(vec![BValue::Str("spam".to_string())]),
                 BValue::List(vec![BValue::Int(42)]),
@@ -133,19 +151,19 @@ mod tests {
     #[test]
     fn test_dict_decoding() {
         // Empty dict
-        assert_eq!(decode(b"de").unwrap(), BValue::Dict(HashMap::new()));
+        assert_eq!(decode(b"de").unwrap().0, BValue::Dict(HashMap::new()));
 
         // Simple dict
         let mut expected = HashMap::new();
         expected.insert("spam".to_string(), BValue::Int(42));
-        assert_eq!(decode(b"d4:spami42ee").unwrap(), BValue::Dict(expected));
+        assert_eq!(decode(b"d4:spami42ee").unwrap().0, BValue::Dict(expected));
 
         // Complex dict
         let mut expected = HashMap::new();
         expected.insert("bar".to_string(), BValue::Str("spam".to_string()));
         expected.insert("foo".to_string(), BValue::Int(42));
         assert_eq!(
-            decode(b"d3:bar4:spam3:fooi42ee").unwrap(),
+            decode(b"d3:bar4:spam3:fooi42ee").unwrap().0,
             BValue::Dict(expected)
         );
 
@@ -175,6 +193,6 @@ mod tests {
         expected.insert("announce".to_string(), BValue::Str("url".to_string()));
         expected.insert("info".to_string(), BValue::Dict(info));
 
-        assert_eq!(decode(input).unwrap(), BValue::Dict(expected));
+        assert_eq!(decode(input).unwrap().0, BValue::Dict(expected));
     }
 }
