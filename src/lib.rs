@@ -87,13 +87,12 @@ pub fn decode(input: &[u8]) -> Result<(BValue, usize), String> {
                         match val {
                             BValue::Str(s) if key_val.0.is_none() => {
                                 key_val.0 = Some(s);
-                                idx += consumed;
                             }
                             v => {
                                 key_val.1 = Some(v);
-                                idx += consumed;
                             }
                         }
+                        idx += consumed;
                     }
                 }
 
