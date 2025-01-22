@@ -78,11 +78,6 @@ pub fn decode(input: &[u8]) -> Result<(BValue, usize), String> {
             loop {
                 let (value, consumed) = decode(&input[idx..])?;
 
-                if let BValue::None = value {
-                    idx += consumed;
-                    break;
-                }
-                
                 match value {
                     BValue::None => {
                         idx += consumed;
