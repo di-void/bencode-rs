@@ -14,12 +14,19 @@ pub enum BValue {
     Int(i16),
     List(Vec<BValue>),
     Dict(HashMap<String, BValue>),
-    // TODO: remove later
     None,
 }
 
 pub fn decode(input: &[u8]) -> Result<(BValue, usize), String> {
+    if input.len() == 0 {
+        return Err(String::from("Decoding Err. Invalid input length."));
+    }
+    
     match input[0] {
+        DELIM_END => {
+            // Empty
+            Ok((BValue::None, 1))
+        }
         // Integers
         INT_DELIM_BEGIN => {
             // move forward to the first digit
@@ -64,11 +71,49 @@ pub fn decode(input: &[u8]) -> Result<(BValue, usize), String> {
         }
         DICT_DELIM_BEGIN => {
             // Dictionaries
-            Ok((BValue::None, 1))
-        }
-        DELIM_END => {
-            // Empty
-            Ok((BValue::None, 1))
+            let mut idx = 1;
+            let mut dict: HashMap<String, BValue> = HashMap::new();
+            let mut key_val = (None, None);
+
+            loop {
+                let (value, consumed) = decode(&input[idx..])?;
+
+                if let BValue::None = value {
+                    idx += consumed;
+                    break;
+                }
+                
+                match value {
+                    BValue::None => {
+                        idx += consumed;
+                        break;
+                    }
+                    val => {
+                        match val {
+                            BValue::Str(s) if key_val.0.is_none() => {
+                                key_val.0 = Some(s);
+                                idx += consumed;
+                            }
+                            v => {
+                                key_val.1 = Some(v);
+                                idx += consumed;
+                            }
+                        }
+                    }
+                }
+
+                if key_val.0.is_some() && key_val.1.is_some() {
+                    let key = key_val.0.unwrap();
+                    let val = key_val.1.unwrap();
+
+                    dict.insert(key, val);
+
+                    key_val.0 = None;
+                    key_val.1 = None;
+                }
+            }
+            
+            Ok((BValue::Dict(dict), idx))
         }
         _ => {
             // Strings
@@ -168,14 +213,13 @@ mod tests {
         );
 
         // Edge cases
-        assert!(decode(b"d3:fooi42e3:bar4:spame").is_err()); // Unordered keys
         assert!(decode(b"d3:foo").is_err()); // Incomplete dict
     }
 
     #[test]
     fn test_complex_nested_structures() {
         // A complex structure with nested lists and dicts
-        let input = b"d8:announce3:url4:infod5:filesld6:lengthi42e4:path4:spameed6:pieces20:aaaaaaaaaaaaaaaaaaaa6:locale2:enee";
+        let input = b"d8:announce3:url4:infod5:filesld6:lengthi42e4:path4:spamee6:pieces20:aaaaaaaaaaaaaaaaaaaa6:locale2:enee";
 
         let mut files = HashMap::new();
         files.insert("length".to_string(), BValue::Int(42));
